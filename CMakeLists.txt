@@ -42,4 +42,4 @@ set(${PROJECT_NAME}_INCLUDE_DIRS
 
 
 target_link_libraries(${PROJECT_NAME} concise_json_schema)
-target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES)
+target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
