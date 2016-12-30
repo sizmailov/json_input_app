@@ -1,6 +1,8 @@
 #include <boost/iostreams/device/file.hpp>
 #include <boost/iostreams/filter/counter.hpp>
 #include <boost/iostreams/filtering_stream.hpp>
+#include <boost/program_options.hpp>
+#include <iomanip>
 #include "json_input_app/ConsoleApplication.h"
 #include "console_style/ConsoleSyle.h"
 
@@ -9,6 +11,7 @@ namespace cs = ConsoleStyle;
 
 namespace bio = boost::iostreams;
 namespace cs = ConsoleStyle;
+using namespace std::string_literals;
 
 namespace {
 class my_counter {
@@ -61,28 +64,120 @@ private:
 };
 }
 
-ConsoleApplication::ConsoleApplication() { is = &std::cin; }
+ConsoleApplication::ConsoleApplication(int argc, char** const argv): argc(argc),argv(argv) { is = &std::cin; }
 
-void ConsoleApplication::setup(int argc, char** argv) {
-  if (argc == 1) {
-    std::cerr << "Wrong usage" << std::endl;
-    setup_rcode = 1;
-  } else {
-    std::string s(argv[1]);
-    if (tasks.count(s)) {
-      task = tasks.at(s).get();
-      setup_rcode = 0;
+ConsoleApplication::SetupStatus ConsoleApplication::setup() {
+
+  namespace po = boost::program_options;
+  po::options_description options("Options");
+  po::options_description no_exec_options("No-exec options");
+  po::options_description all_options;
+
+  po::positional_options_description positional_options;
+
+  positional_options.add("task", 1);
+
+
+  no_exec_options.add_options()
+      ("help,h","print help message")
+      ("version","print program version")
+      ("credits","print authors list")
+      ;
+  options.add_options()
+      ("verbose",po::value<int>()->default_value(0),"set verbosity level")
+      ("task",po::value<std::string>()->value_name("<str>"),"task name")
+      ("color",po::value<std::string>()->default_value("auto"s)->value_name("[auto|on|off]"),"set console coloring mode")
+      ;
+
+  all_options.add(options).add(no_exec_options);
+
+
+  auto print_usage = [&](std::ostream& out){
+    out << cs::bright() << "Usage:" << std::endl;
+    out << "    "<< cs::green()<<cs::bright() << argv[0];
+    out << cs::magenta() << " [no-exec-options]" << std::endl;
+    out << "    "<< cs::green()<<cs::bright() << argv[0];
+    out << cs::yellow() << " [options]" << cs::cyan()<< " {task_name}" << std::endl;
+    out << cs::bright() << "Tasks:" <<std::endl;
+    for (auto&x: tasks){
+      auto docs = x.second->schema.doc_strings();
+      auto doc = docs.empty()? "<do description>"s:docs.front();
+      out << "    "<< cs::cyan()<<std::setw(15) << std::left << x.first;
+      out << doc << std::endl;
+    }
+    out << cs::yellow() << options << "\n";
+    out << cs::magenta() << no_exec_options << "\n";
+  };
+
+  po::variables_map vm;
+
+  try {
+    po::store(po::command_line_parser(argc, argv).options(all_options)
+      .positional(positional_options)
+      .run(), vm);
+    po::notify(vm);
+  } catch (std::exception& e) {
+    std::cerr << "Error: " << e.what() << "\n";
+    print_usage(std::cerr);
+    return SetupStatus::BadOptions;
+  }
+
+
+
+  if (vm.count("color")){
+    auto color = vm["color"].as<std::string>();
+    if (color=="auto"){
+      cs::set_cerr_style_mode(cs::ConsoleMode::AUTO);
+    }else if (color=="on"){
+      cs::set_cerr_style_mode(cs::ConsoleMode::FORCE_COLORS);
+    } else if (color=="off"){
+      cs::set_cerr_style_mode(cs::ConsoleMode::FORCE_NO_COLORS);
     } else {
-      std::cerr << "Wrong task name " << std::endl;
-      std::cerr << "<print help here>" << std::endl;
-      setup_rcode = 1;
+      std::cerr << cs::red() << "Bad `color` option: "<< color << std::endl;
+      print_usage(std::cerr);
+      return SetupStatus::BadOptions;
     }
   }
+  if (vm.count("verbose")){
+    auto verbosity = vm["verbose"].as<int>();
+    // todo update verbosity
+  }
+  if (vm.count("help")) {
+    print_usage(std::cout);
+    return SetupStatus::NoExecOptions;
+  }
+  if (vm.count("credits")){
+    std::cout << cs::bright() <<"Authors: "<< std::endl;
+    for (auto& name_email: std::vector<std::pair<std::string,std::string>>{
+        {"sizmailov", "sergei.a.izmailov@gmail.com"}
+    }){
+      std::cout <<"   "<<cs::magenta() << name_email.first << " " << cs::white() << cs::italic() << name_email.second << std::endl;
+    }
+    return SetupStatus::NoExecOptions;
+  }else if (vm.count("task")){
+    auto task_name = vm["task"].as<std::string>();
+    if (tasks.count(task_name)){
+      task = tasks[task_name].get();
+      return SetupStatus::GoodOptions;
+    }else{
+      std::cerr << cs::red() << "Unknown task name `" << task_name<<"`"<<std::endl;
+      print_usage(std::cerr);
+    }
+  }
+  print_usage(std::cerr);
+  return SetupStatus::BadOptions;
 }
 
 int ConsoleApplication::exec() {
-  if (setup_rcode != 0) {
-    return 1;
+  auto setup_rcode = setup();
+  switch (setup_rcode){
+    case SetupStatus::BadOptions:
+      std::cerr << cs::red() << "No execution performed, due to error in program arguments" << std::endl;
+      return 1;
+    case SetupStatus::NoExecOptions:
+      return 0;
+    case SetupStatus::GoodOptions:
+      break;
   }
 
   Json json;
@@ -99,7 +194,7 @@ int ConsoleApplication::exec() {
       int lines = in.component<0, my_counter>()->lines();
       int characters = in.component<0, my_counter>()->characters();
       auto last_line = in.component<0, my_counter>()->last_line();
-      //read rest of line
+      //read rest of line if available
       for (int i=0;i<10;i++){
         char c;
         in.read(&c,1);
@@ -125,7 +220,6 @@ int ConsoleApplication::exec() {
     return task->run();
   } catch (const SchemaMatchResult::MatchError& e) {
     task->print_schema();
-//    std::cout << std::flush;
     std::cerr << std::endl;
     std::cerr << cs::cyan() << "Bad input:" << std::endl;
     std::cerr << cs::red() << e << std::endl;
