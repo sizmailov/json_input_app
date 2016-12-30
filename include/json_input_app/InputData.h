@@ -61,3 +61,18 @@ struct InputData {
 };
 }
 
+namespace JSON{
+namespace io{
+
+template<typename T>
+struct JsonSerializer<T,typename std::enable_if_t<std::is_base_of<InputData,T>::value>> {
+  static void deserialize(const Json& json, T& t){
+    t.parse(json);
+  }
+  static Json serialize(const T& t){
+    return t.serialize();
+  }
+};
+
+}
+}
