@@ -13,7 +13,7 @@ include_directories(${concise_json_schema_INCLUDE_DIRS})
 include_directories(include)
 include_directories(external/delegate)
 
-#add_subdirectory(test)
+add_subdirectory(test)
 
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp )
 
