@@ -1,0 +1,3 @@
+[submodule "external/concise_json_schema"]
+	path = external/concise_json_schema
+	url = git@github.com:sizmailov/concise_json_schema.git
