@@ -6,10 +6,9 @@ git:
   submodules: false
   
 before_install:
-    - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+    - if [ -f .gitmodules ] ; then sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules ; fi
     - git submodule update --init 
-    - git submodule foreach 'sed -i \'s/git@github.com:/https:\/\/github.com\//\' .gitmodules\'
-    - git submodule update --init --recursive
+    - git submodule foreach "if [ -f .gitmodules ] ; then sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules ; fi &&  git submodule update --init && git submodule foreach \"if [ -f .gitmodules ] ; then sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules ; fi &&  git submodule update --init \""
 matrix:
   include:
     - compiler: gcc
