@@ -15,6 +15,14 @@ include_directories(external/delegate)
 
 add_subdirectory(test)
 
+set(Boost_USE_STATIC_LIBS OFF) 
+set(Boost_USE_MULTITHREADED ON)  
+set(Boost_USE_STATIC_RUNTIME OFF) 
+find_package(Boost COMPONENTS iostreams system REQUIRED) 
+
+include_directories(${Boost_INCLUDE_DIRS}) 
+
+
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp )
 
 add_library(${PROJECT_NAME} ${SOURCE_FILES})
@@ -25,7 +33,9 @@ target_link_libraries(${PROJECT_NAME}_example ${PROJECT_NAME})
 set(${PROJECT_NAME}_INCLUDE_DIRS
         ${PROJECT_SOURCE_DIR}/include
         ${concise_json_schema_INCLUDE_DIRS}
+        ${Boost_INCLUDE_DIRS}
         CACHE INTERNAL "${PROJECT_NAME}: Include Directories" FORCE)
 
 
 target_link_libraries(${PROJECT_NAME} concise_json_schema)
+target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES)
