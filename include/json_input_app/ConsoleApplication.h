@@ -1,5 +1,7 @@
 #pragma once
+
 #include "Task.h"
+#include "Logger.h"
 
 namespace JSON{
 class ConsoleApplication {

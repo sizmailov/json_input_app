@@ -5,6 +5,7 @@
 #include <iomanip>
 #include "json_input_app/ConsoleApplication.h"
 #include "console_style/ConsoleSyle.h"
+#include "json_input_app/Logger.h"
 
 using namespace JSON;
 namespace cs = ConsoleStyle;
@@ -71,25 +72,29 @@ ConsoleApplication::SetupStatus ConsoleApplication::setup() {
   namespace po = boost::program_options;
   po::options_description options("Options");
   po::options_description no_exec_options("No-exec options");
+  po::options_description task_option;
   po::options_description all_options;
 
   po::positional_options_description positional_options;
 
   positional_options.add("task", 1);
 
-
   no_exec_options.add_options()
       ("help,h","print help message")
       ("version","print program version")
       ("credits","print authors list")
       ;
+  task_option.add_options()
+      ("task",po::value<std::string>()->value_name("<str>"),"task name");
+
   options.add_options()
-      ("verbose",po::value<int>()->default_value(0),"set verbosity level")
-      ("task",po::value<std::string>()->value_name("<str>"),"task name")
+      ("logfile",po::value<std::string>()->value_name("<filename>"),"creates logfile is specified")
+      ("logstderr", "prints log messages in stderr")
+      ("verbose",po::value<int>()->default_value(Logger::WARNING),"set verbosity level")
       ("color",po::value<std::string>()->default_value("auto"s)->value_name("[auto|on|off]"),"set console coloring mode")
       ;
 
-  all_options.add(options).add(no_exec_options);
+  all_options.add(options).add(no_exec_options).add(task_option);
 
 
   auto print_usage = [&](std::ostream& out){
@@ -138,10 +143,6 @@ ConsoleApplication::SetupStatus ConsoleApplication::setup() {
       return SetupStatus::BadOptions;
     }
   }
-  if (vm.count("verbose")){
-    auto verbosity = vm["verbose"].as<int>();
-    // todo update verbosity
-  }
   if (vm.count("help")) {
     print_usage(std::cout);
     return SetupStatus::NoExecOptions;
@@ -154,7 +155,19 @@ ConsoleApplication::SetupStatus ConsoleApplication::setup() {
       std::cout <<"   "<<cs::magenta() << name_email.first << " " << cs::white() << cs::italic() << name_email.second << std::endl;
     }
     return SetupStatus::NoExecOptions;
-  }else if (vm.count("task")){
+  }
+
+  if (vm.count("task")){
+    if (vm.count("logfile") || vm.count("logstderr")){
+      auto verbosity = vm["verbose"].as<int>();
+      std::experimental::optional<std::string> logfile;
+      if (vm.count("logfile")) logfile = vm["logfile"].as<std::string>();
+      bool stderr_log = vm.count("logstderr");
+      if (verbosity>Logger::VERBOSE) verbosity= Logger::VERBOSE;
+      if (verbosity<Logger::_ERROR) verbosity= Logger::_ERROR;
+      Logger::init(logfile, static_cast<Logger::LOG_LEVEL>(verbosity),stderr_log);
+    }
+
     auto task_name = vm["task"].as<std::string>();
     if (tasks.count(task_name)){
       task = tasks[task_name].get();
@@ -185,47 +198,68 @@ int ConsoleApplication::exec() {
   in.push(my_counter{1, 1});
   in.push(*is, 1, 1);
 
+  LOG_SCOPE_INFO("Starting task processing");
   try {
     assert(task);
-    try {
-      in >> json;
-    }catch(JsonException&e){
-
-      int lines = in.component<0, my_counter>()->lines();
-      int characters = in.component<0, my_counter>()->characters();
-      auto last_line = in.component<0, my_counter>()->last_line();
-      //read rest of line if available
-      for (int i=0;i<10;i++){
-        char c;
-        in.read(&c,1);
-        if (!in.good() || c=='\n'){
-          break;
-        }else{
-          last_line+=c;
-        }
+    {
+      LOG_SCOPE_TRACE("Reading input");
+      try {
+        in >> json;
       }
-      auto filler_size = characters-(characters>0 ? 2 : 0);
+      catch (JsonException& e) {
 
-      std::cerr << cs::cyan() << "Bad input:" << std::endl;
-      std::cerr << "Error at line ";
+        int lines = in.component<0, my_counter>()->lines();
+        int characters = in.component<0, my_counter>()->characters();
+        auto last_line = in.component<0, my_counter>()->last_line();
 
-      std::cerr << cs::yellow() << lines;
-      std::cerr << ":";
-      std::cerr << cs::yellow() << characters << ":" << std::endl;
-      std::cerr << last_line << std::endl;
-      std::cerr << cs::red()<<std::string(filler_size, ' ') << "^" << std::string(10, '~') << " " << e.what() << std::endl;
-      return 1;
+        LOG_ERROR("Error at line "+std::to_string(lines)+":"+std::to_string(characters)+": "+e.what());
+        //read rest of line if available
+        for (int i = 0; i<10; i++) {
+          char c;
+          in.read(&c, 1);
+          if (!in.good() || c=='\n') {
+            break;
+          }
+          else {
+            last_line += c;
+          }
+        }
+        auto filler_size = characters-(characters>0 ? 2 : 0);
+
+        std::cerr << cs::cyan() << "Bad input:" << std::endl;
+        std::cerr << "Error at line ";
+
+        std::cerr << cs::yellow() << lines;
+        std::cerr << ":";
+        std::cerr << cs::yellow() << characters << ":" << std::endl;
+        std::cerr << last_line << std::endl;
+        std::cerr << cs::red() << std::string(filler_size, ' ') << "^" << std::string(10, '~') << " " << e.what()
+                  << std::endl;
+        return 1;
+      }
     }
-    task->parse(json);
+    LOG_INFO("Input is a valid JSON");
+    {
+      LOG_SCOPE_INFO("Checking input");
+      try {
+        task->parse(json);
+      }
+      catch (const SchemaMatchResult::MatchError& e) {
+        LOG_ERROR("Json does not match schema: "s+e.what());
+        task->print_schema();
+        std::cerr << std::endl;
+        std::cerr << cs::cyan() << "Bad input:" << std::endl;
+        std::cerr << cs::red() << e << std::endl;
+        e.pretty_wordy_print(std::cerr);
+        std::cerr << std::endl;
+        return 1;
+      }
+    }
+
+    LOG_INFO("Input is valid");
+
+    LOG_SCOPE_INFO("Running task");
     return task->run();
-  } catch (const SchemaMatchResult::MatchError& e) {
-    task->print_schema();
-    std::cerr << std::endl;
-    std::cerr << cs::cyan() << "Bad input:" << std::endl;
-    std::cerr << cs::red() << e << std::endl;
-    e.pretty_wordy_print(std::cerr);
-    std::cerr << std::endl;
-    return 1;
   } catch (const std::exception& e) {
     std::cerr << cs::cyan() << "Unhandled exception:";
     std::cerr << cs::red() << "   what(): " << e.what();
