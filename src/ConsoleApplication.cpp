@@ -224,7 +224,7 @@ int ConsoleApplication::exec() {
             last_line += c;
           }
         }
-        auto filler_size = characters-(characters>0 ? 2 : 0);
+        auto filler_size = std::max(characters-2,0);
 
         std::cerr << cs::cyan() << "Bad input:" << std::endl;
         std::cerr << "Error at line ";
