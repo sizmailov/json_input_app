@@ -185,7 +185,7 @@ int ConsoleApplication::exec() {
   auto setup_rcode = setup();
   switch (setup_rcode){
     case SetupStatus::BadOptions:
-      std::cerr << cs::red() << "No execution performed, due to error in program arguments" << std::endl;
+      std::cerr << cs::red() << "Execution was not performed due to an error in program arguments" << std::endl;
       return 1;
     case SetupStatus::NoExecOptions:
       return 0;
