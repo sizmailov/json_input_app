@@ -19,8 +19,6 @@ include_directories(${Boost_INCLUDE_DIRS})
 add_subdirectory(external/concise_json_schema)
 include_directories(${concise_json_schema_INCLUDE_DIRS})
 
-# 2) delegate
-include_directories(external/delegate)
 
 # self includes
 include_directories(include)

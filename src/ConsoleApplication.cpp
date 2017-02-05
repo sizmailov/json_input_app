@@ -88,7 +88,7 @@ ConsoleApplication::SetupStatus ConsoleApplication::setup() {
       ("task",po::value<std::string>()->value_name("<str>"),"task name");
 
   options.add_options()
-      ("logfile",po::value<std::string>()->value_name("<filename>"),"creates logfile is specified")
+      ("logfile",po::value<std::string>()->value_name("<filename>"),"creates logfile if specified")
       ("logstderr", "prints log messages in stderr")
       ("verbose",po::value<int>()->default_value(Logger::WARNING),"set verbosity level")
       ("color",po::value<std::string>()->default_value("auto"s)->value_name("[auto|on|off]"),"set console coloring mode")
@@ -104,10 +104,14 @@ ConsoleApplication::SetupStatus ConsoleApplication::setup() {
     out << "    "<< cs::green()<<cs::bright() << argv[0];
     out << cs::yellow() << " [options]" << cs::cyan()<< " {task_name}" << std::endl;
     out << cs::bright() << "Tasks:" <<std::endl;
+    size_t max_task_name = 0;
+    for (auto&x: tasks){
+      max_task_name = std::max(x.first.size(),max_task_name);
+    }
     for (auto&x: tasks){
       auto docs = x.second->schema.doc_strings();
-      auto doc = docs.empty()? "<do description>"s:docs.front();
-      out << "    "<< cs::cyan()<<std::setw(15) << std::left << x.first;
+      auto doc = docs.empty()? "<no description>"s:docs.front();
+      out << "    "<< cs::cyan()<<std::setw(max_task_name+5) << std::left << x.first;
       out << doc << std::endl;
     }
     out << cs::yellow() << options << "\n";
