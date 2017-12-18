@@ -2,7 +2,7 @@
 
 #include "concise_json_schema/JsonSerializerStd.h"
 #include "concise_json_schema/Schema.h"
-#include "delegate.h"
+#include <functional>
 
 namespace JSON {
 
@@ -43,7 +43,7 @@ struct InputData {
   }
 
   /* some properties might be constructed indirectly via supplied @param deserializer */
-  void bind(std::string name, Schema s, delegate<void(const Json&)>&& deserializer,
+  void bind(std::string name, Schema s, std::function<void(const Json&)>&& deserializer,
             estd::optional<Json> default_value = {}) {
     schema.get_object().add_property(name, prop(s, default_value, !!default_value));
     bindings.emplace_back([ name, deserializer = std::move(deserializer), default_value ](const Json& json) {
@@ -56,8 +56,8 @@ struct InputData {
   Schema schema;
 
  private:
-  std::vector<delegate<void(const Json&)>> bindings;
-  std::vector<delegate<std::pair<std::string, Json>()>> serialize_bindings;
+  std::vector<std::function<void(const Json&)>> bindings;
+  std::vector<std::function<std::pair<std::string, Json>()>> serialize_bindings;
 };
 }
 
