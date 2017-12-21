@@ -3,6 +3,7 @@
 #include "concise_json_schema/JsonSerializerStd.h"
 #include "concise_json_schema/Schema.h"
 #include <functional>
+#include "Logger.h"
 
 namespace JSON {
 
@@ -24,6 +25,7 @@ struct InputData {
   void bind(T& member, std::string name, estd::optional<Json> default_value = {}) {
     schema.get_object().add_property(name, prop(member.schema, default_value, !!default_value));
     bindings.emplace_back([&member, name, default_value](const Json& json) {
+      LOG_SCOPE_VERBOSE(name);
       const Json& jvalue = json.count(name) ? json(name) : default_value.value();
       JSON::deserialize(jvalue, member);
     });
@@ -35,6 +37,7 @@ struct InputData {
   void bind(T& member, std::string name, Schema s, estd::optional<Json> default_value = {}) {
     schema.get_object().add_property(name, prop(s, default_value, !!default_value));
     bindings.emplace_back([&member, name, default_value](const Json& json) {
+      LOG_SCOPE_VERBOSE(name);
       const Json& jvalue = json.count(name) ? json(name) : default_value.value();
       JSON::deserialize(jvalue, member);
     });
@@ -47,6 +50,7 @@ struct InputData {
             estd::optional<Json> default_value = {}) {
     schema.get_object().add_property(name, prop(s, default_value, !!default_value));
     bindings.emplace_back([ name, deserializer = std::move(deserializer), default_value ](const Json& json) {
+      LOG_SCOPE_VERBOSE(name);
       const Json& jvalue = json.count(name) ? json(name) : default_value.value();
       deserializer(jvalue);
     });
