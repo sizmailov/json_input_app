@@ -56,6 +56,9 @@ class Logger {
 
    public:
     ScopeGuard(const char* _sign, const char* file, int line, LOG_LEVEL _lvl);
+    ScopeGuard(const std::string& _sign, const char* file, int line, LOG_LEVEL _lvl);
+    ScopeGuard(std::string& _sign, const char* file, int line, LOG_LEVEL _lvl);
+    ScopeGuard(std::string&& _sign, const char* file, int line, LOG_LEVEL _lvl) = delete;
     ~ScopeGuard();
   };
 

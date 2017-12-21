@@ -74,7 +74,19 @@ void Logger::log(const std::string& log_info, const std::string& comment, LOG_LE
   }
 }
 
-Logger::ScopeGuard::ScopeGuard(const char* sign, const char* file, int line, LOG_LEVEL lvl) :lvl(lvl), sign(sign) {
+Logger::ScopeGuard::ScopeGuard(const char* _sign, const char* file, int line, LOG_LEVEL lvl) :lvl(lvl), sign(_sign) {
+  if (lvl <= instance().log_level) {
+    log(std::string(sign) + " {",  "  // file:" + std::string(file)+":"+std::to_string(line), (lvl), +2);
+  }
+}
+
+Logger::ScopeGuard::ScopeGuard(const std::string& _sign, const char* file, int line, LOG_LEVEL lvl) :lvl(lvl), sign(_sign.c_str()) {
+  if (lvl <= instance().log_level) {
+    log(std::string(sign) + " {", "  // file:" + std::string(file) + ":" + std::to_string(line), (lvl), +2);
+  }
+}
+
+Logger::ScopeGuard::ScopeGuard(std::string& _sign, const char* file, int line, LOG_LEVEL lvl) :lvl(lvl), sign(_sign.c_str()) {
   if (lvl <= instance().log_level) {
     log(std::string(sign) + " {",  "  // file:" + std::string(file)+":"+std::to_string(line), (lvl), +2);
   }
